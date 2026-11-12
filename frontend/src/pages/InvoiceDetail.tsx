@@ -41,8 +41,8 @@ export function InvoiceDetail() {
     setError(null)
     try {
       await action()
-      setNotice(message)
       await load()
+      setNotice(message)
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'That action could not be completed.')
     } finally {
