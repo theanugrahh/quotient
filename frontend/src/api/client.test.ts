@@ -1,10 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, api, apiUrl, request, setCsrfToken } from './client'
+import { ApiError, api, apiUrl, request, resolveTarget, setCsrfToken } from './client'
 
 describe('apiUrl', () => {
   it('joins the base url and the path', () => {
     expect(apiUrl('/auth/me')).toBe('http://localhost:8000/api/auth/me')
     expect(apiUrl('auth/me')).toBe('http://localhost:8000/api/auth/me')
+  })
+})
+
+describe('resolveTarget', () => {
+  it('prefixes relative paths with the api base', () => {
+    expect(resolveTarget('/billing/mock/checkout/abc')).toBe('http://localhost:8000/api/billing/mock/checkout/abc')
+  })
+
+  it('leaves absolute urls untouched', () => {
+    expect(resolveTarget('https://checkout.stripe.com/c/pay/cs_1')).toBe('https://checkout.stripe.com/c/pay/cs_1')
   })
 })
 

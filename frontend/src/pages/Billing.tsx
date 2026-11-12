@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, apiUrl, ApiError } from '../api/client'
+import { api, ApiError, resolveTarget } from '../api/client'
 import type { Payment, Plan } from '../api/types'
 import { Alert, Button, Card, Spinner } from '../components/ui'
 import { formatDateTime, formatMoney } from '../lib/format'
@@ -32,7 +32,7 @@ export function Billing() {
     setError(null)
     try {
       const checkout = await api.post<{ url: string }>('/billing/checkout', { plan: 'pro' })
-      window.location.href = apiUrl(checkout.url)
+      window.location.href = resolveTarget(`${checkout.url}?return_to=/billing`)
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Could not start the checkout.')
       setBusy(false)

@@ -49,7 +49,7 @@ review.
 | Data | SQLite for local development, PostgreSQL for production |
 | Payments | Provider interface with a Stripe implementation and a signed sandbox implementation |
 | Web client | React 19, TypeScript, Vite, Tailwind CSS v4, React Router |
-| Tests | pytest + FastAPI `TestClient` (80 tests), Vitest (14 tests), Playwright walkthrough |
+| Tests | pytest + FastAPI `TestClient` (96 tests), Vitest (16 tests), Playwright walkthrough |
 | Tooling | Ruff, ESLint, `tsc --noEmit`, GitHub Actions, Docker |
 
 ## Security model
@@ -68,7 +68,7 @@ review.
 | Sessions | Short-lived signed tokens in `HttpOnly`, `SameSite=Lax` cookies; `Secure` and HSTS are enabled in production. |
 | CSRF | A double-submit token is cross-checked against the claim inside the signed session token on every mutating request. |
 | Webhooks | Signature verification before parsing, replay protection by event id, and idempotent application of payment state. |
-| Browser | A strict `Content-Security-Policy`, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy` and `Permissions-Policy` on every response. |
+| Browser | A strict `Content-Security-Policy` with a per-response nonce for the one inline script, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy` and `Permissions-Policy` on every response. |
 
 ## Getting started
 
@@ -194,6 +194,14 @@ quotient/
 │       └── pages/           # routed screens
 └── docs/screenshots/
 ```
+
+## Security notes
+
+`docs/SECURITY.md` walks through each control, the threat it addresses and the
+test that proves it. In short: money is recalculated on the server, objects
+are scoped to their owner, mutating requests need a CSRF token that matches
+the signed session, uploads are checked by content, and payment events are
+verified and de-duplicated before they touch any state.
 
 ## Notes and limitations
 

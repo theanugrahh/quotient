@@ -57,16 +57,18 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
         headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()")
         headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
-        headers.setdefault("Content-Security-Policy", self._content_security_policy())
+        headers.setdefault("Content-Security-Policy", self._content_security_policy(request))
         if settings.is_production:
             headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response
 
-    def _content_security_policy(self) -> str:
+    def _content_security_policy(self, request: Request) -> str:
         connect = " ".join(["'self'", *settings.cors_origins])
+        nonce = getattr(request.state, "csp_nonce", None)
+        script_source = f"'self' 'nonce-{nonce}'" if nonce else "'self'"
         return (
             "default-src 'self'; "
-            "script-src 'self'; "
+            f"script-src {script_source}; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "

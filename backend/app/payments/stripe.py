@@ -41,8 +41,8 @@ class StripePaymentProvider:
                 }
             ],
             metadata={"user_id": user_id, "plan": plan},
-            success_url=f"{settings.api_prefix}/billing/mock/return?status=success",
-            cancel_url=f"{settings.api_prefix}/billing/mock/return?status=cancelled",
+            success_url=f"{settings.app_url}/billing?checkout=success",
+            cancel_url=f"{settings.app_url}/billing?checkout=cancelled",
         )
         return CheckoutSession(session_id=session.id, path=session.url or "", provider=self.name)
 

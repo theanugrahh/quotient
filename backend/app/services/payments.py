@@ -6,8 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.logging_config import get_logger
 from app.models import Invoice, InvoiceStatus, Payment, User, UserPlan, WebhookEvent
 from app.payments.base import PaymentEvent
+
+logger = get_logger("app.payments")
 
 
 def record_event(db: Session, provider: str, event_id: str, event_type: str) -> bool:
@@ -15,7 +18,8 @@ def record_event(db: Session, provider: str, event_id: str, event_type: str) -> 
     db.add(WebhookEvent(provider=provider, event_id=event_id, event_type=event_type))
     try:
         db.flush()
-    except IntegrityError:
+    except IntegrityError as exc:
+        logger.warning("duplicate_webhook_event provider=%s event_id=%s detail=%s", provider, event_id, exc.orig)
         db.rollback()
         return False
     return True

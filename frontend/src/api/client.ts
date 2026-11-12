@@ -28,6 +28,10 @@ export function apiUrl(path: string): string {
   return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
 }
 
+export function resolveTarget(url: string): string {
+  return /^https?:\/\//.test(url) ? url : apiUrl(url)
+}
+
 type RequestOptions = {
   method?: string
   body?: unknown

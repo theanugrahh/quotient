@@ -1,14 +1,24 @@
 from __future__ import annotations
 
+import secrets
 import uuid
 from datetime import UTC, datetime
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 
 from app.config import settings
-from app.deps import CsrfGuard, CurrentUser, DbSession, get_current_user, rate_limited, record_audit
+from app.deps import (
+    CsrfGuard,
+    CurrentUser,
+    DbSession,
+    get_current_user,
+    optional_current_user,
+    rate_limited,
+    record_audit,
+)
 from app.errors import NotFoundError, PermissionDenied
 from app.models import Payment, UserPlan
 from app.payments import get_provider
@@ -91,17 +101,40 @@ def create_checkout(
     return CheckoutOut(session_id=session.session_id, url=session.path)
 
 
-@router.get("/mock/checkout/{session_id}", response_class=HTMLResponse)
-def mock_checkout_page(session_id: str, request: Request, user: CurrentUser, db: DbSession) -> HTMLResponse:
+def _app_origin(request: Request) -> str:
+    """Work out where to send the browser once the payment completes."""
+    if settings.app_url:
+        return settings.app_url.rstrip("/")
+    referer = request.headers.get("referer")
+    if referer:
+        parsed = urlsplit(referer)
+        if parsed.scheme and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}"
+    return str(request.base_url).rstrip("/")
+
+
+def _find_session(session_id: str, db) -> Payment:
     payment = db.execute(
         select(Payment).where(Payment.provider == "mock", Payment.provider_ref == session_id)
     ).scalar_one_or_none()
     if payment is None:
         raise NotFoundError("Checkout session not found.", code="session_not_found")
-    if payment.user_id != user.id:
-        raise PermissionDenied("This checkout session belongs to another account.")
+    return payment
+
+
+@router.get("/mock/checkout/{session_id}", response_class=HTMLResponse)
+def mock_checkout_page(session_id: str, request: Request, db: DbSession) -> HTMLResponse:
+    payment = _find_session(session_id, db)
+    if payment.invoice_id is None:
+        # A plan upgrade is only visible to the account that started it.
+        user = optional_current_user(request, db)
+        if user is None or user.id != payment.user_id:
+            raise PermissionDenied("This checkout session belongs to another account.")
 
     return_to = request.query_params.get("return_to", "/billing")
+    origin = _app_origin(request)
+    nonce = secrets.token_urlsafe(16)
+    request.state.csp_nonce = nonce
     amount = payment.amount_cents / 100
     label = "Quotient Pro plan" if payment.plan == UserPlan.PRO else f"Invoice payment {payment.invoice_id or ''}"
     csrf_cookie = settings.csrf_cookie_name
@@ -136,7 +169,7 @@ def mock_checkout_page(session_id: str, request: Request, user: CurrentUser, db:
     <button id="pay">Pay ${amount:,.2f}</button>
     <p class="note" id="status"></p>
   </div>
-<script>
+<script nonce="{nonce}">
   const readCookie = (name) => document.cookie.split('; ')
     .map(part => part.trim())
     .find(part => part.startsWith(name + '='))
@@ -153,7 +186,7 @@ def mock_checkout_page(session_id: str, request: Request, user: CurrentUser, db:
         headers: {{ 'X-CSRF-Token': readCookie('{csrf_cookie}') }},
       }});
       if (!response.ok) throw new Error('Payment could not be completed.');
-      window.location.href = '{settings.app_url}' + '{return_to}' + '?paid=1';
+      window.location.href = '{origin}' + '{return_to}' + '?paid=1';
     }} catch (error) {{
       status.textContent = error.message;
       button.disabled = false;
@@ -165,15 +198,14 @@ def mock_checkout_page(session_id: str, request: Request, user: CurrentUser, db:
     return HTMLResponse(content=html)
 
 
-@router.post("/mock/checkout/{session_id}/complete", dependencies=[Depends(get_current_user), CsrfGuard])
-def complete_mock_checkout(session_id: str, user: CurrentUser, db: DbSession) -> dict:
-    payment = db.execute(
-        select(Payment).where(Payment.provider == "mock", Payment.provider_ref == session_id)
-    ).scalar_one_or_none()
-    if payment is None:
-        raise NotFoundError("Checkout session not found.", code="session_not_found")
-    if payment.user_id != user.id:
-        raise PermissionDenied("This checkout session belongs to another account.")
+@router.post("/mock/checkout/{session_id}/complete", dependencies=[CsrfGuard])
+def complete_mock_checkout(session_id: str, request: Request, db: DbSession) -> dict:
+    payment = _find_session(session_id, db)
+    if payment.invoice_id is None:
+        # A plan upgrade can only be completed by the account that started it.
+        user = optional_current_user(request, db)
+        if user is None or user.id != payment.user_id:
+            raise PermissionDenied("This checkout session belongs to another account.")
 
     payload = build_mock_payload(
         event_id=f"evt_mock_{uuid.uuid4().hex[:20]}",

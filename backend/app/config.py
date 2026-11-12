@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     app_name: str = "Quotient"
     environment: str = "development"
     api_prefix: str = "/api"
-    app_url: str = "http://localhost:5173"
+    app_url: str = ""
 
     database_url: str = f"sqlite:///{PROJECT_ROOT / 'data' / 'quotient.db'}"
 

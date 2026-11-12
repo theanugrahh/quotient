@@ -61,6 +61,14 @@ def get_current_user(request: Request, db: DbSession) -> User:
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+def optional_current_user(request: Request, db: Session) -> User | None:
+    """Resolve the signed in account when there is one, without raising."""
+    try:
+        return get_current_user(request, db)
+    except AuthenticationError:
+        return None
+
+
 def require_admin(user: CurrentUser) -> User:
     if user.role != UserRole.ADMIN:
         raise PermissionDenied("Administrator access required.")

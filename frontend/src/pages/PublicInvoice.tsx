@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, apiUrl, ApiError } from '../api/client'
+import { api, ApiError, resolveTarget } from '../api/client'
 import type { PublicInvoice } from '../api/types'
 import { Alert, Button, Card, Spinner, StatusBadge } from '../components/ui'
 import { formatDate, formatMoney } from '../lib/format'
@@ -27,7 +27,7 @@ export function PublicInvoice() {
     setError(null)
     try {
       const checkout = await api.post<{ url: string }>(`/public/invoices/${token}/checkout`)
-      window.location.href = apiUrl(checkout.url)
+      window.location.href = resolveTarget(`${checkout.url}?return_to=/invoice/${token}`)
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Could not start the payment.')
       setBusy(false)

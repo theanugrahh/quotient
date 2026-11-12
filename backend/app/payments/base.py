@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Protocol
 
-from app.config import settings
-
 
 @dataclass(frozen=True)
 class CheckoutSession:
@@ -83,7 +81,7 @@ class MockPaymentProvider:
         session_id = f"cs_mock_{secrets.token_urlsafe(16)}"
         return CheckoutSession(
             session_id=session_id,
-            path=f"{settings.api_prefix}/billing/mock/checkout/{session_id}",
+            path=f"/billing/mock/checkout/{session_id}",
             provider=self.name,
         )
 
@@ -100,15 +98,18 @@ class MockPaymentProvider:
             raise SignatureError("Signature verification failed.")
 
         try:
-            data = json.loads(payload)
+            body = json.loads(payload)
         except json.JSONDecodeError as exc:
             raise SignatureError("Payload is not valid JSON.") from exc
 
-        data = json.loads(payload).get("data", {})
-        data_obj = data.get("object", data) if isinstance(data, dict) else {}
+        data_obj = body.get("data", {}).get("object", {})
+        event_id = str(body.get("id", ""))
+        if not event_id:
+            raise SignatureError("Payload is missing an event id.")
+
         return PaymentEvent(
-            event_id=str(data.get("id", "")),
-            event_type=str(data.get("type", "")),
+            event_id=event_id,
+            event_type=str(body.get("type", "")),
             provider_ref=str(data_obj.get("session_id") or data_obj.get("id", "")),
             user_id=data_obj.get("user_id"),
             amount_cents=int(Decimal(str(data_obj.get("amount_cents", 0)))),

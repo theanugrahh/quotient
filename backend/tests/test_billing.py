@@ -73,6 +73,30 @@ def test_webhook_processing_is_idempotent(client) -> None:
     assert second.json()["status"] == "duplicate"
 
 
+def test_webhook_without_an_event_id_is_rejected(client) -> None:
+    provider = MockPaymentProvider(settings.mock_webhook_secret)
+    payload = json.dumps({"type": "checkout.session.completed", "data": {"object": {}}}).encode()
+    signature = provider.sign(payload, int(time.time()))
+    response = client.post(
+        f"{BASE_URL}/webhooks/mock",
+        content=payload,
+        headers={"X-Webhook-Signature": signature},
+    )
+    assert response.status_code == 422
+
+
+def test_two_different_payments_are_both_applied(auth_client) -> None:
+    for _ in range(2):
+        checkout = auth_client.post(f"{BASE_URL}/billing/checkout", json={"plan": "pro"})
+        session_id = checkout.json()["session_id"]
+        complete = auth_client.post(f"{BASE_URL}/billing/mock/checkout/{session_id}/complete")
+        assert complete.json()["status"] == "applied"
+
+    history = auth_client.get(f"{BASE_URL}/billing/payments").json()
+    assert len(history) == 2
+    assert all(entry["status"] == "paid" for entry in history)
+
+
 def test_unknown_provider_is_rejected(client) -> None:
     response = client.post(f"{BASE_URL}/webhooks/nowhere", content=b"{}")
     assert response.status_code == 422
@@ -84,7 +108,9 @@ def test_checkout_upgrades_the_account_to_pro(auth_client) -> None:
 
     checkout = auth_client.post(f"{BASE_URL}/billing/checkout", json={"plan": "pro"})
     assert checkout.status_code == 200, checkout.text
-    session_id = checkout.json()["session_id"]
+    body = checkout.json()
+    session_id = body["session_id"]
+    assert body["url"] == f"/billing/mock/checkout/{session_id}"
 
     page = auth_client.get(f"{BASE_URL}/billing/mock/checkout/{session_id}")
     assert page.status_code == 200
