@@ -84,7 +84,15 @@ jobs:
 
       - name: Scan tracked files for credentials
         run: |
-          if git grep -nEI '(sk_live_[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' -- . ':!*.lock'; then
+          # The patterns are assembled from fragments on purpose: a literal
+          # credential shape in this file would trip the push protection
+          # scanner that runs on every push.
+          stripe='sk_live_'
+          github='ghp_'
+          aws='AKIA'
+          pem='-----BEGIN '
+          pattern="(${stripe}[A-Za-z0-9]{16,}|${github}[A-Za-z0-9]{20,}|${aws}[0-9A-Z]{16}|${pem}[A-Z ]*PRIVATE KEY-----)"
+          if git grep -nEI "$pattern" -- . ':!*.lock'; then
             echo "Potential credential found in the repository."
             exit 1
           fi
