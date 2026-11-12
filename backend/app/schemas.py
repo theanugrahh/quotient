@@ -61,6 +61,10 @@ class CsrfOut(BaseModel):
     csrf_token: str
 
 
+class SessionStateOut(BaseModel):
+    user: UserOut | None = None
+
+
 # ------------------------------------------------------------------------- clients
 
 

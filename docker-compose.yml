@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: quotient
+      POSTGRES_USER: quotient
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quotient}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U quotient']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - '5432:5432'
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      COOKIE_SECURE: 'false'
+      DATABASE_URL: postgresql+psycopg://quotient:${POSTGRES_PASSWORD:-quotient}@db:5432/quotient
+      UPLOADS_DIR: /app/data/uploads
+      CORS_ORIGINS: http://localhost:8000
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-mock}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    volumes:
+      - app-data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '8000:8000'
+
+volumes:
+  postgres-data:
+  app-data:

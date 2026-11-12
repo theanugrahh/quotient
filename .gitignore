@@ -45,3 +45,6 @@ logs/
 .idea/
 .vscode/
 *.swp
+
+# TypeScript incremental build cache
+frontend/tsconfig.tsbuildinfo

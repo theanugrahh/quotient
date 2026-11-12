@@ -15,11 +15,14 @@ from app.schemas import (
     PasswordChangeRequest,
     RegisterRequest,
     SessionOut,
+    SessionStateOut,
     UserOut,
 )
 from app.security import (
+    TokenError,
     create_access_token,
     create_csrf_token,
+    decode_access_token,
     dummy_verify,
     hash_password,
     password_problems,
@@ -132,6 +135,21 @@ def logout(response: Response) -> Response:
     clear_auth_cookies(response)
     response.status_code = 204
     return response
+
+
+@router.get("/session", response_model=SessionStateOut)
+def session_state(request: Request, db: DbSession) -> SessionStateOut:
+    token = request.cookies.get(settings.cookie_name)
+    if not token:
+        return SessionStateOut(user=None)
+    try:
+        payload = decode_access_token(token)
+    except TokenError:
+        return SessionStateOut(user=None)
+    user = db.get(User, payload.get("sub", ""))
+    if user is None or not user.is_active:
+        return SessionStateOut(user=None)
+    return SessionStateOut(user=UserOut.model_validate(user))
 
 
 @router.get("/me", response_model=UserOut)
