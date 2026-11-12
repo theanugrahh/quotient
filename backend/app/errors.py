@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
@@ -112,6 +113,18 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=exc.status_code,
             content=_envelope(code, message, request_id),
             headers=getattr(exc, "headers", None),
+        )
+
+    @app.exception_handler(IntegrityError)
+    async def handle_integrity_error(request: Request, exc: IntegrityError) -> JSONResponse:
+        request_id = getattr(request.state, "request_id", "-")
+        logger.info("integrity_error request_id=%s", request_id)
+        db = getattr(request.state, "db", None)
+        if db is not None:
+            db.rollback()
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=_envelope("conflict", "That record already exists or conflicts with an existing one.", request_id),
         )
 
     @app.exception_handler(Exception)

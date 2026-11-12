@@ -77,7 +77,7 @@ def create_client(
     client = Client(
         owner_id=user.id,
         name=payload.name,
-        email=payload.email or "",
+        email=payload.email or None,
         company=payload.company,
         notes=payload.notes,
     )
@@ -110,8 +110,8 @@ def update_client(
 ) -> ClientOut:
     client = _owned_client(client_id, user.id, db)
     data = payload.model_dump(exclude_unset=True)
-    if "email" in data and data["email"] is not None:
-        data["email"] = str(data["email"])
+    if "email" in data:
+        data["email"] = str(data["email"]) if data["email"] else None
     for field, value in data.items():
         setattr(client, field, value)
     db.commit()

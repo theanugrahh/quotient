@@ -76,10 +76,12 @@ class ClientCreate(BaseModel):
     company: Annotated[str, Field(max_length=160)] = ""
     notes: Annotated[str, Field(max_length=2000)] = ""
 
-    @field_validator("email")
+    @field_validator("email", mode="before")
     @classmethod
-    def _blank_email(cls, value: EmailStr | None) -> EmailStr | None:
-        return value or None
+    def _blank_email(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 class ClientUpdate(BaseModel):
@@ -91,6 +93,13 @@ class ClientUpdate(BaseModel):
     notes: Annotated[str, Field(max_length=2000)] | None = None
     archived: bool | None = None
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def _blank_email(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
 
 class ClientOut(ApiModel):
     id: str
@@ -100,6 +109,13 @@ class ClientOut(ApiModel):
     notes: str
     archived: bool
     created_at: datetime
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _blank_email(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 # ----------------------------------------------------------------------- invoices

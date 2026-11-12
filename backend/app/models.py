@@ -102,7 +102,7 @@ class Client(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    email: Mapped[str] = mapped_column(String(320), default="", nullable=False)
+    email: Mapped[str | None] = mapped_column(String(320), default=None, nullable=True)
     company: Mapped[str] = mapped_column(String(160), default="", nullable=False)
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

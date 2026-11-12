@@ -73,6 +73,16 @@ def test_upload_rejects_an_unknown_invoice(auth_client) -> None:
     assert response.status_code == 404
 
 
+def test_upload_cannot_be_attached_to_another_accounts_invoice(auth_client, second_client) -> None:
+    from tests.conftest import create_client_record, create_invoice
+
+    client_record = create_client_record(auth_client)
+    invoice = create_invoice(auth_client, client_record["id"])
+
+    response = _upload(second_client, invoice_id=invoice["id"])
+    assert response.status_code == 404
+
+
 def test_files_are_not_shared_between_accounts(auth_client, second_client) -> None:
     created = _upload(auth_client).json()
     assert second_client.get(f"{BASE_URL}/files/{created['id']}/content").status_code == 404
